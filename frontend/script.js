@@ -1,4 +1,21 @@
-const API = `${window.location.protocol}//${window.location.hostname}:3001`;
+const host = window.location.hostname;
+const isLocalHost =
+  host === "localhost" ||
+  host === "127.0.0.1" ||
+  host.startsWith("100.") || // Tailscale IPv4
+  host.startsWith("192.168.") ||
+  host.startsWith("10.") ||
+  host.startsWith("172.16.") ||
+  host.startsWith("172.17.") ||
+  host.startsWith("172.18.") ||
+  host.startsWith("172.19.") ||
+  host.startsWith("172.2") ||
+  host.startsWith("172.30.") ||
+  host.startsWith("172.31.");
+
+const API = isLocalHost
+  ? `${window.location.protocol}//${host}:3001`
+  : "https://control-horas-backend.onrender.com";
 let USER_ID = null;
 let selectedMonth = null;
 let graficoMensualInstance = null;
