@@ -1,0 +1,18 @@
+{
+  "name": "control-horas",
+  "private": true,
+  "scripts": {
+    "start": "./start.sh",
+    "start:backend": "npm start --prefix backend",
+    "start:frontend": "python3 -m http.server 8080 --directory frontend --bind 0.0.0.0",
+    "pm2:start": "npx pm2 start ecosystem.config.js",
+    "pm2:restart": "npx pm2 restart ecosystem.config.js",
+    "pm2:stop": "npx pm2 stop ecosystem.config.js",
+    "pm2:delete": "npx pm2 delete ecosystem.config.js",
+    "pm2:status": "npx pm2 status",
+    "pm2:logs": "npx pm2 logs"
+  },
+  "devDependencies": {
+    "pm2": "^6.0.14"
+  }
+}

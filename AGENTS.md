@@ -158,6 +158,14 @@ Antes de realizar cambios en el código:
 - `DELETE /delete-hour/:id` está alineado con el frontend y recibe `user_id` por body.
 - El período del dashboard ya se muestra en formato amigable, por ejemplo `Febrero 2026`.
 - El gráfico mensual ya usa labels amigables, por ejemplo `Feb 2026`.
+- El perfil ya permite configurar `billing_cutoff_day` (día de cierre mensual) por usuario.
+- El backend ya usa `billing_cutoff_day` en:
+  - `GET /resumen`
+  - `GET /hours-by-month`
+- Si un usuario no tiene `billing_cutoff_day` configurado, se usa `20` por defecto para mantener compatibilidad.
+- Los sectores ya no se crean automáticamente para usuarios nuevos.
+- `Triage` y `Urgencia Domiciliaria` dejaron de sembrarse por defecto.
+- Ahora cada usuario debe crear sus propios sectores desde Perfil antes de cargar horas si todavía no tiene ninguno.
 
 Estado actual confirmado:
 
@@ -179,15 +187,13 @@ Estado actual confirmado:
 
 Pendientes reales detectados en la última revisión:
 
-1. Mostrar mejor las tarifas actuales en la interfaz
-- En `frontend/script.js` existe `updateHourlyRateUI()`.
-- Esa función intenta actualizar:
-  - `#currentHourlyRate`
-  - `#currentHourlyRateNight`
-- Pero esos elementos no existen hoy en `frontend/index.html`.
-- Decidir si:
-  - se agregan al dashboard como cards o texto visible
-  - o se elimina esa lógica si ya no se quiere mostrar ahí
+1. Revisar experiencia inicial cuando el usuario no tiene sectores creados
+- Hoy no se siembran sectores por defecto.
+- Esto es lo esperado para cuentas nuevas.
+- Verificar si conviene agregar:
+  - texto de ayuda más visible
+  - CTA para crear el primer sector
+  - bloqueo visual más claro en formularios hasta que exista al menos un sector
 
 2. Revisar navegación por año en el panel principal
 - Los botones de meses del dashboard principal usan siempre el año actual.
@@ -210,7 +216,7 @@ Si retomamos este proyecto más adelante, primero revisar:
 
 Siguiente paso sugerido al volver:
 
-- Resolver la visualización de `Valor hora normal` y `Valor hora nocturna` en el dashboard.
+- Evaluar si hace falta mejorar el onboarding cuando no hay sectores creados todavía.
 - Después evaluar mejora de navegación por año en la vista principal.
 - Feb 2026
 - Mar 2026
@@ -258,6 +264,120 @@ o
 o
 - un formulario inline debajo de la fila
 o
+
+--------------------------------
+ACTUALIZACION DE CONTINUIDAD - MARZO 2026
+--------------------------------
+
+Trabajo reciente ya implementado:
+
+- Se agregó un flujo base de aprobacion manual de usuarios para vender la app.
+- El registro sigue haciéndose con `Supabase Auth` desde `frontend/auth.js`.
+- Despues del `signUp`, el frontend llama al backend para registrar la solicitud de aprobacion.
+- El backend:
+  - marca al usuario como `pending`
+  - genera un token unico
+  - envia un mail de aprobacion al administrador
+  - expone un link para aprobar al usuario
+- Mientras el usuario no este aprobado, no puede usar la app.
+
+Archivos modificados en esta etapa:
+
+- `frontend/auth.js`
+- `backend/server.js`
+- `backend/package.json`
+- `backend/.env.example`
+- `backend/sql/004_add_user_approval_flow.sql`
+
+Endpoints nuevos agregados en backend:
+
+- `POST /auth/register-request`
+- `GET /auth/approval-status`
+- `GET /auth/approve-user?token=...`
+
+Comportamiento actual del flujo de aprobacion:
+
+1. El usuario crea cuenta en el frontend.
+2. Supabase crea el usuario.
+3. El frontend llama a `POST /auth/register-request`.
+4. El backend guarda estado `pending` y manda mail al admin.
+5. El admin recibe el mail en `digitalnexoweb@gmail.com`.
+6. El admin aprueba entrando al link de `GET /auth/approve-user`.
+7. El backend marca al usuario como `approved`.
+8. Solo desde ese momento el usuario puede entrar y usar endpoints de horas.
+
+Protecciones ya implementadas:
+
+- `add-hours`, `resumen`, `hours-by-month`, `hours-by-calendar-month`, `delete-hour` y `update-hour`
+  verifican si el usuario esta aprobado.
+- Si el usuario esta `pending`, el backend responde `403`.
+- El frontend tambien chequea el estado al iniciar sesion y al recuperar sesion.
+
+Base de datos / SQL pendiente de aplicar:
+
+- Ejecutar en Supabase el archivo:
+  - `backend/sql/004_add_user_approval_flow.sql`
+
+Variables de entorno nuevas requeridas en backend:
+
+- `APPROVAL_BASE_URL`
+- `ADMIN_APPROVAL_EMAIL`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_SECURE`
+- `MAIL_FROM`
+
+Configuracion recomendada elegida:
+
+- proveedor de mail recomendado: `Resend`
+- `SMTP_HOST=smtp.resend.com`
+- `SMTP_PORT=465`
+- `SMTP_USER=resend`
+- `SMTP_SECURE=true`
+- `ADMIN_APPROVAL_EMAIL=digitalnexoweb@gmail.com`
+
+Importante sobre Resend:
+
+- El usuario compartio una API key de Resend en el chat.
+- Esa key debe considerarse comprometida.
+- No reutilizar esa key.
+- Revocarla en Resend y crear una nueva con permiso `sending_access`.
+
+Pendiente manual real para la proxima vez:
+
+1. Revocar la API key expuesta de Resend.
+2. Crear una nueva API key para `control-horas-production`.
+3. Confirmar cual es el dominio verificado en Resend.
+4. Completar `MAIL_FROM` con ese dominio verificado.
+5. Cargar variables nuevas en Render.
+6. Ejecutar el SQL `004_add_user_approval_flow.sql` en Supabase.
+7. Probar flujo completo:
+   - registro
+   - mail recibido por admin
+   - aprobacion desde link
+   - login permitido luego de aprobar
+
+Notas tecnicas para retomar:
+
+- `backend/.env.example` ya fue actualizado con las variables nuevas.
+- `backend/.env` local ya tiene placeholders agregados para aprobacion y SMTP.
+- No se completaron `SMTP_PASS` ni `MAIL_FROM` por seguridad.
+- `node --check` paso correctamente en:
+  - `backend/server.js`
+  - `frontend/auth.js`
+
+Riesgo / detalle a revisar al volver:
+
+- En la instalacion local aparecieron warnings de engine porque `@supabase/supabase-js` actual pide `Node >= 20`.
+- Revisar version de Node en Render y, si hace falta, mover deploy a Node 20.
+
+Siguiente paso sugerido al volver:
+
+- Terminar configuracion real de Resend + Render + Supabase.
+- Probar el flujo de aprobacion de punta a punta.
+- Recién despues seguir con mejoras de UI o dashboard.
 - reutilizar el formulario principal cargando los datos
 
 Elegí la solución más limpia y usable.
