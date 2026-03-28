@@ -4,6 +4,7 @@ create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   hourly_rate numeric,
+  billing_cutoff_day integer default 20 check (billing_cutoff_day between 1 and 31),
   address text,
   phone text,
   birth_date date,
