@@ -109,10 +109,18 @@ const client = createClient(supabaseUrl, supabaseKey, {
 });
 
 function notify(message, type = "error") {
-  if (typeof window.showToast === "function") {
+  const appContainer = document.getElementById("app");
+  const appVisible =
+    appContainer &&
+    appContainer.style.display !== "none" &&
+    !appContainer.hidden;
+
+  if (typeof window.showToast === "function" && appVisible) {
     window.showToast(message, type);
     return;
   }
+
+  console[type === "error" ? "error" : "log"]("[control-horas][auth]", message);
   alert(message);
 }
 
@@ -340,12 +348,23 @@ async function login() {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
 
+  if (!email) {
+    notify("Ingresá tu email", "error");
+    return;
+  }
+
+  if (!password) {
+    notify("Ingresá tu contraseña", "error");
+    return;
+  }
+
   const { data, error } = await client.auth.signInWithPassword({
     email,
     password
   });
 
   if (error) {
+    console.error("[control-horas][auth] signInWithPassword error", error);
     notify(error.message, "error");
   } else {
     const hasAccess = await enforceApprovedAccess(data.user);
