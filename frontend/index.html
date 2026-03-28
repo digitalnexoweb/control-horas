@@ -8,11 +8,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Control Horas" />
 
-  <link rel="icon" type="image/x-icon" href="favicon.ico" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="manifest" href="site.webmanifest" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,15 +24,36 @@
 <!-- LOGIN -->
 <div id="auth-container">
   <p class="auth-kicker">Control de Horas</p>
-  <h2>Iniciar sesión</h2>
-  <p class="auth-subtitle">Gestioná turnos, horas y recibos desde un solo lugar.</p>
+  <div class="auth-switch" role="tablist" aria-label="Opciones de acceso">
+    <button id="showLoginViewBtn" class="auth-switch-btn active" type="button" data-auth-view="login" aria-pressed="true">Iniciar sesión</button>
+    <button id="showRequestViewBtn" class="auth-switch-btn" type="button" data-auth-view="request" aria-pressed="false">Solicitar acceso</button>
+  </div>
 
-  <form id="authForm" class="auth-form" autocomplete="on">
-    <input type="email" id="email" placeholder="Email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
-    <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
-    <button type="submit">Entrar</button>
-    <button class="btn-secondary" type="button" onclick="register()">Crear cuenta</button>
-  </form>
+  <section id="loginView" class="auth-view active" aria-labelledby="showLoginViewBtn">
+    <h2>Iniciar sesión</h2>
+    <p class="auth-subtitle">Entrá con tu cuenta ya aprobada para seguir usando la app.</p>
+
+    <form id="authForm" class="auth-form" autocomplete="on">
+      <input type="email" id="email" placeholder="Email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
+      <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
+      <button type="submit">Entrar</button>
+    </form>
+  </section>
+
+  <section id="requestView" class="auth-view" aria-labelledby="showRequestViewBtn" hidden>
+    <h2>Solicitar acceso</h2>
+    <p class="auth-subtitle">Dejá tus datos una sola vez. Cuando el administrador apruebe la solicitud, ya podés entrar directo.</p>
+
+    <form id="requestAccessForm" class="auth-form" autocomplete="on">
+      <input type="email" id="requestEmail" placeholder="Email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
+      <input type="password" id="requestPassword" placeholder="Contraseña" autocomplete="new-password">
+      <input type="password" id="requestPasswordConfirm" placeholder="Confirmar contraseña" autocomplete="new-password">
+      <input type="tel" id="requestPhone" placeholder="Teléfono" autocomplete="tel">
+      <input type="text" id="requestInstitution" placeholder="Institución / empresa" autocomplete="organization">
+      <textarea id="requestMessage" placeholder="Mensaje para la solicitud (opcional)" rows="4"></textarea>
+      <button class="btn-secondary" type="submit">Enviar solicitud</button>
+    </form>
+  </section>
 </div>
 
 <!-- APP (OCULTA HASTA LOGIN) -->
@@ -83,7 +103,7 @@
             <div class="card-dashboard">
               <span class="label">📅 Período</span>
               <span class="value" id="periodo">--</span>
-              <p class="card-note">Corte del 21 al 20 según la lógica actual.</p>
+              <p id="periodoNota" class="card-note">Corte mensual según la configuración actual del perfil.</p>
             </div>
 
             <!-- GRAFICO COMO CARD -->
@@ -205,6 +225,11 @@
                       <label for="profileHourlyRateNight">Valor por hora nocturno</label>
                       <input type="number" id="profileHourlyRateNight" min="0" step="0.01" placeholder="Ingresá tu tarifa nocturna">
                     </div>
+
+                    <div class="profile-field">
+                      <label for="profileBillingCutoffDay">Día de cierre mensual</label>
+                      <input type="number" id="profileBillingCutoffDay" min="1" max="31" step="1" placeholder="Ej: 20">
+                    </div>
                   </div>
                 </div>
 
@@ -243,6 +268,10 @@
                   <div class="profile-summary-item">
                     <span class="profile-summary-label">Valor hora nocturna</span>
                     <strong id="currentHourlyRateNight" class="profile-summary-value">No definido</strong>
+                  </div>
+                  <div class="profile-summary-item">
+                    <span class="profile-summary-label">Día de cierre mensual</span>
+                    <strong id="currentBillingCutoffDay" class="profile-summary-value">20</strong>
                   </div>
                 </div>
               </aside>
@@ -384,8 +413,8 @@
 
 <!-- SUPABASE -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="auth.js"></script>
-<script src="script.js"></script>
+<script src="auth.js?v=20260324-1"></script>
+<script src="script.js?v=20260324-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 </body>

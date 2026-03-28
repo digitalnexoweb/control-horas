@@ -267,15 +267,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const showLoginViewBtn = document.getElementById("showLoginViewBtn");
   const showRequestViewBtn = document.getElementById("showRequestViewBtn");
 
-  if (!emailInput || !passwordInput || !requestEmailInput || !requestPasswordInput || !requestPasswordConfirmInput) return;
+  if (!emailInput || !passwordInput) return;
 
-  setAuthView("login");
+  if (requestEmailInput && requestPasswordInput && requestPasswordConfirmInput) {
+    setAuthView("login");
+  }
 
   const storedEmail = getStoredEmail();
   if (storedEmail && !emailInput.value) {
     emailInput.value = storedEmail;
   }
-  if (storedEmail && !requestEmailInput.value) {
+  if (storedEmail && requestEmailInput && !requestEmailInput.value) {
     requestEmailInput.value = storedEmail;
   }
 
@@ -293,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (requestAccessForm) {
+  if (requestAccessForm && requestEmailInput && requestPasswordInput && requestPasswordConfirmInput) {
     requestAccessForm.addEventListener("submit", (e) => {
       e.preventDefault();
       register();
@@ -310,8 +312,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   emailInput.addEventListener("change", () => storeEmail(emailInput.value));
   emailInput.addEventListener("blur", () => storeEmail(emailInput.value));
-  requestEmailInput.addEventListener("change", () => storeEmail(requestEmailInput.value));
-  requestEmailInput.addEventListener("blur", () => storeEmail(requestEmailInput.value));
+  if (requestEmailInput) {
+    requestEmailInput.addEventListener("change", () => storeEmail(requestEmailInput.value));
+    requestEmailInput.addEventListener("blur", () => storeEmail(requestEmailInput.value));
+  }
   emailInput.addEventListener("keydown", handleEnterLogin);
   passwordInput.addEventListener("keydown", handleEnterLogin);
 
