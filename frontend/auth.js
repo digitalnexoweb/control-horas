@@ -1,3 +1,4 @@
+(() => {
 const { createClient } = supabase;
 
 const supabaseUrl = "https://kslcypddazdiqnvnubrx.supabase.co";
@@ -5,6 +6,8 @@ const supabaseKey = "sb_publishable_BMTlXGKImkkM_MuhH1t83g_bhNDsctI";
 
 const LAST_EMAIL_STORAGE_KEY = "controlHorasLastEmail";
 const SUPABASE_AUTH_STORAGE_KEY = "control-horas-auth";
+const REMOTE_API = "https://control-horas-waxk.onrender.com";
+const LOCAL_API_PORT = "3001";
 
 const browserStorage = {
   getItem(key) {
@@ -30,6 +33,70 @@ const browserStorage = {
     }
   }
 };
+
+function isLoopbackHost(host) {
+  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+}
+
+function isPrivateIpHost(host) {
+  return (
+    host.startsWith("100.") ||
+    host.startsWith("192.168.") ||
+    host.startsWith("10.") ||
+    host.startsWith("172.16.") ||
+    host.startsWith("172.17.") ||
+    host.startsWith("172.18.") ||
+    host.startsWith("172.19.") ||
+    host.startsWith("172.2") ||
+    host.startsWith("172.30.") ||
+    host.startsWith("172.31.")
+  );
+}
+
+function isTailnetDnsHost(host) {
+  return host.endsWith(".ts.net") || host.endsWith(".beta.tailscale.net");
+}
+
+function isSingleLabelHost(host) {
+  return /^[a-z0-9-]+$/i.test(host) && !host.includes(".");
+}
+
+function isPrivateOrTailnetHost(host) {
+  return isPrivateIpHost(host) || isTailnetDnsHost(host) || isSingleLabelHost(host);
+}
+
+function getLocalApiUrl(host) {
+  return `${window.location.protocol}//${host}:${LOCAL_API_PORT}`;
+}
+
+function resolveApiBaseUrl() {
+  const host = window.location.hostname;
+  const apiParam = new URLSearchParams(window.location.search).get("api");
+
+  if (apiParam === "local") {
+    return getLocalApiUrl(host);
+  }
+
+  if (apiParam === "remote") {
+    return REMOTE_API;
+  }
+
+  if (apiParam) {
+    try {
+      return new URL(apiParam).toString().replace(/\/$/, "");
+    } catch (error) {
+      console.warn("Parametro api invalido, se usara la API remota", error);
+    }
+  }
+
+  if (isLoopbackHost(host) || isPrivateOrTailnetHost(host)) {
+    return getLocalApiUrl(host);
+  }
+
+  return REMOTE_API;
+}
+
+const API = resolveApiBaseUrl();
 
 const client = createClient(supabaseUrl, supabaseKey, {
   auth: {
@@ -62,6 +129,35 @@ function setAuthVisibility(isAuthenticated) {
   }
 }
 
+function setAuthView(view) {
+  const loginView = document.getElementById("loginView");
+  const requestView = document.getElementById("requestView");
+  const showLoginViewBtn = document.getElementById("showLoginViewBtn");
+  const showRequestViewBtn = document.getElementById("showRequestViewBtn");
+
+  const isLoginView = view !== "request";
+
+  if (loginView) {
+    loginView.classList.toggle("active", isLoginView);
+    loginView.hidden = !isLoginView;
+  }
+
+  if (requestView) {
+    requestView.classList.toggle("active", !isLoginView);
+    requestView.hidden = isLoginView;
+  }
+
+  if (showLoginViewBtn) {
+    showLoginViewBtn.classList.toggle("active", isLoginView);
+    showLoginViewBtn.setAttribute("aria-pressed", String(isLoginView));
+  }
+
+  if (showRequestViewBtn) {
+    showRequestViewBtn.classList.toggle("active", !isLoginView);
+    showRequestViewBtn.setAttribute("aria-pressed", String(!isLoginView));
+  }
+}
+
 function getStoredEmail() {
   return browserStorage.getItem(LAST_EMAIL_STORAGE_KEY) || "";
 }
@@ -72,16 +168,107 @@ function storeEmail(email) {
   browserStorage.setItem(LAST_EMAIL_STORAGE_KEY, normalizedEmail);
 }
 
+async function authApiFetch(path, options = {}) {
+  const {
+    method = "GET",
+    body,
+    query,
+    errorMessage = "No se pudo completar la solicitud"
+  } = options;
+
+  const url = new URL(`${API}${path}`);
+  if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, String(value));
+      }
+    });
+  }
+
+  const requestOptions = { method, headers: {} };
+  if (body !== undefined) {
+    requestOptions.headers["Content-Type"] = "application/json";
+    requestOptions.body = JSON.stringify(body);
+  }
+
+  let response;
+  try {
+    response = await fetch(url.toString(), requestOptions);
+  } catch (error) {
+    throw new Error(errorMessage);
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json") ? await response.json() : null;
+
+  if (!response.ok) {
+    throw new Error(data?.error || errorMessage);
+  }
+
+  return data;
+}
+
+async function getApprovalStatus(userId) {
+  return authApiFetch("/auth/approval-status", {
+    query: { user_id: userId },
+    errorMessage: "No se pudo verificar el estado de aprobacion"
+  });
+}
+
+async function requestAccess({ email, password, phone, institution, message }) {
+  return authApiFetch("/auth/register-request", {
+    method: "POST",
+    body: {
+      email,
+      password,
+      phone,
+      institution,
+      message
+    },
+    errorMessage: "No se pudo enviar la solicitud de acceso"
+  });
+}
+
+async function enforceApprovedAccess(user) {
+  if (!user?.id) return true;
+
+  try {
+    const approval = await getApprovalStatus(user.id);
+    if (approval?.approved) {
+      return true;
+    }
+
+    await client.auth.signOut();
+    setAuthVisibility(false);
+    notify(approval?.message || "Tu cuenta está pendiente de aprobación por el administrador.", "error");
+    return false;
+  } catch (error) {
+    console.error("No se pudo verificar la aprobacion del usuario", error);
+    return true;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const authForm = document.getElementById("authForm");
+  const requestAccessForm = document.getElementById("requestAccessForm");
   const emailInput = document.getElementById("email");
   const passwordInput = document.getElementById("password");
+  const requestEmailInput = document.getElementById("requestEmail");
+  const requestPasswordInput = document.getElementById("requestPassword");
+  const requestPasswordConfirmInput = document.getElementById("requestPasswordConfirm");
+  const showLoginViewBtn = document.getElementById("showLoginViewBtn");
+  const showRequestViewBtn = document.getElementById("showRequestViewBtn");
 
-  if (!emailInput || !passwordInput) return;
+  if (!emailInput || !passwordInput || !requestEmailInput || !requestPasswordInput || !requestPasswordConfirmInput) return;
+
+  setAuthView("login");
 
   const storedEmail = getStoredEmail();
   if (storedEmail && !emailInput.value) {
     emailInput.value = storedEmail;
+  }
+  if (storedEmail && !requestEmailInput.value) {
+    requestEmailInput.value = storedEmail;
   }
 
   const handleEnterLogin = (e) => {
@@ -98,8 +285,25 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (requestAccessForm) {
+    requestAccessForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      register();
+    });
+  }
+
+  if (showLoginViewBtn) {
+    showLoginViewBtn.addEventListener("click", () => setAuthView("login"));
+  }
+
+  if (showRequestViewBtn) {
+    showRequestViewBtn.addEventListener("click", () => setAuthView("request"));
+  }
+
   emailInput.addEventListener("change", () => storeEmail(emailInput.value));
   emailInput.addEventListener("blur", () => storeEmail(emailInput.value));
+  requestEmailInput.addEventListener("change", () => storeEmail(requestEmailInput.value));
+  requestEmailInput.addEventListener("blur", () => storeEmail(requestEmailInput.value));
   emailInput.addEventListener("keydown", handleEnterLogin);
   passwordInput.addEventListener("keydown", handleEnterLogin);
 
@@ -116,6 +320,17 @@ document.addEventListener("DOMContentLoaded", () => {
 // INICIALIZAR
 async function initUser() {
   const { data: { session } } = await client.auth.getSession();
+  if (session?.user?.email) {
+    storeEmail(session.user.email);
+  }
+
+  if (session?.user) {
+    const hasAccess = await enforceApprovedAccess(session.user);
+    if (!hasAccess) {
+      return null;
+    }
+  }
+
   setAuthVisibility(Boolean(session));
   return session;
 }
@@ -133,6 +348,11 @@ async function login() {
   if (error) {
     notify(error.message, "error");
   } else {
+    const hasAccess = await enforceApprovedAccess(data.user);
+    if (!hasAccess) {
+      return;
+    }
+
     storeEmail(data.user?.email || email);
     location.reload();
   }
@@ -140,19 +360,58 @@ async function login() {
 
 // REGISTER
 async function register() {
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
+  const email = document.getElementById("requestEmail").value.trim();
+  const password = document.getElementById("requestPassword").value;
+  const passwordConfirm = document.getElementById("requestPasswordConfirm").value;
+  const phone = document.getElementById("requestPhone")?.value.trim() || "";
+  const institution = document.getElementById("requestInstitution")?.value.trim() || "";
+  const message = document.getElementById("requestMessage")?.value.trim() || "";
 
-  const { data, error } = await client.auth.signUp({
-    email,
-    password
-  });
+  if (!email) {
+    notify("Ingresá un email válido", "error");
+    return;
+  }
 
-  if (error) {
+  if (!password || password.length < 6) {
+    notify("La contraseña debe tener al menos 6 caracteres", "error");
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    notify("La confirmación de contraseña no coincide", "error");
+    return;
+  }
+
+  try {
+    await requestAccess({
+      email,
+      password,
+      phone,
+      institution,
+      message
+    });
+    storeEmail(email);
+    const requestMessageField = document.getElementById("requestMessage");
+    const requestPhoneField = document.getElementById("requestPhone");
+    const requestInstitutionField = document.getElementById("requestInstitution");
+    const requestEmailField = document.getElementById("requestEmail");
+    const requestPasswordField = document.getElementById("requestPassword");
+    const requestPasswordConfirmField = document.getElementById("requestPasswordConfirm");
+    if (requestMessageField) requestMessageField.value = "";
+    if (requestPhoneField) requestPhoneField.value = "";
+    if (requestInstitutionField) requestInstitutionField.value = "";
+    if (requestPasswordField) requestPasswordField.value = "";
+    if (requestPasswordConfirmField) requestPasswordConfirmField.value = "";
+    if (requestEmailField) requestEmailField.value = email;
+    notify("Solicitud enviada. Cuando sea aprobada, vas a poder entrar con este mismo email y contraseña.", "success");
+    setAuthView("login");
+  } catch (error) {
+    if (String(error.message || "").includes("envio de solicitudes de acceso")) {
+      notify("El boton funciona, pero el servidor todavia no tiene configurado el envio de mails. Falta completar SMTP_PASS en el backend.", "error");
+      return;
+    }
+
     notify(error.message, "error");
-  } else {
-    storeEmail(data.user?.email || email);
-    notify("Cuenta creada. Revisá tu email para confirmar la cuenta.", "success");
   }
 }
 
@@ -161,3 +420,9 @@ async function logout() {
   await client.auth.signOut();
   location.reload();
 }
+
+window.client = client;
+window.initUser = initUser;
+window.logout = logout;
+window.register = register;
+})();

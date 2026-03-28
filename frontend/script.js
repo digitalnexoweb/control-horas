@@ -1,21 +1,70 @@
-const host = window.location.hostname;
-const isLocalHost =
-  host === "localhost" ||
-  host === "127.0.0.1" ||
-  host.startsWith("100.") ||
-  host.startsWith("192.168.") ||
-  host.startsWith("10.") ||
-  host.startsWith("172.16.") ||
-  host.startsWith("172.17.") ||
-  host.startsWith("172.18.") ||
-  host.startsWith("172.19.") ||
-  host.startsWith("172.2") ||
-  host.startsWith("172.30.") ||
-  host.startsWith("172.31.");
+const REMOTE_API = "https://control-horas-waxk.onrender.com";
+const LOCAL_API_PORT = "3001";
 
-const API = isLocalHost
-  ? `${window.location.protocol}//${host}:3001`
-  : "https://control-horas-backend.onrender.com";
+function isLoopbackHost(host) {
+  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+}
+
+function isPrivateIpHost(host) {
+  return (
+    host.startsWith("100.") ||
+    host.startsWith("192.168.") ||
+    host.startsWith("10.") ||
+    host.startsWith("172.16.") ||
+    host.startsWith("172.17.") ||
+    host.startsWith("172.18.") ||
+    host.startsWith("172.19.") ||
+    host.startsWith("172.2") ||
+    host.startsWith("172.30.") ||
+    host.startsWith("172.31.")
+  );
+}
+
+function isTailnetDnsHost(host) {
+  return host.endsWith(".ts.net") || host.endsWith(".beta.tailscale.net");
+}
+
+function isSingleLabelHost(host) {
+  return /^[a-z0-9-]+$/i.test(host) && !host.includes(".");
+}
+
+function isPrivateOrTailnetHost(host) {
+  return isPrivateIpHost(host) || isTailnetDnsHost(host) || isSingleLabelHost(host);
+}
+
+function getLocalApiUrl(host) {
+  return `${window.location.protocol}//${host}:${LOCAL_API_PORT}`;
+}
+
+function resolveApiBaseUrl() {
+  const host = window.location.hostname;
+  const apiParam = new URLSearchParams(window.location.search).get("api");
+
+  if (apiParam === "local") {
+    return getLocalApiUrl(host);
+  }
+
+  if (apiParam === "remote") {
+    return REMOTE_API;
+  }
+
+  if (apiParam) {
+    try {
+      return new URL(apiParam).toString().replace(/\/$/, "");
+    } catch (error) {
+      console.warn("Parametro api invalido, se usara la API remota", error);
+    }
+  }
+
+  if (isLoopbackHost(host) || isPrivateOrTailnetHost(host)) {
+    return getLocalApiUrl(host);
+  }
+
+  return REMOTE_API;
+}
+
+const API = resolveApiBaseUrl();
+console.info("[control-horas] API base:", API, "host:", window.location.hostname);
 
 const MONTH_NAMES = [
   "Enero",
@@ -62,7 +111,7 @@ let currentUserSectors = [];
 const PROFILE_STORAGE_PREFIX = "controlHorasPerfil:";
 const RECEIPT_STORAGE_PREFIX = "controlHorasRecibos:";
 const THEME_STORAGE_KEY = "controlHorasTheme";
-const DEFAULT_USER_SECTORS = ["Urgencia Domiciliaria", "Triage"];
+const DEFAULT_BILLING_CUTOFF_DAY = 20;
 
 function getPreferredTheme() {
   const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
@@ -123,6 +172,27 @@ function getPayPeriodLabel(month, year) {
   return `${MONTH_NAMES[month - 1]} ${year}`;
 }
 
+function normalizeBillingCutoffDay(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 31) {
+    return DEFAULT_BILLING_CUTOFF_DAY;
+  }
+
+  return parsed;
+}
+
+function getBillingPeriodDescription(cutoffDay = DEFAULT_BILLING_CUTOFF_DAY) {
+  const normalizedCutoff = normalizeBillingCutoffDay(cutoffDay);
+  const startDay = normalizedCutoff === 31 ? 1 : normalizedCutoff + 1;
+  return `Cierre del ${startDay} al ${normalizedCutoff} según tu perfil.`;
+}
+
+function updateDashboardPeriodNote() {
+  const periodNoteEl = document.getElementById("periodoNota");
+  if (!periodNoteEl) return;
+  periodNoteEl.textContent = getBillingPeriodDescription(currentProfile?.billing_cutoff_day);
+}
+
 function formatMonthKey(key) {
   if (!key || typeof key !== "string") return key || "";
   const [year, month] = key.split("-");
@@ -158,11 +228,13 @@ function formatHours(value) {
   return Number.isFinite(hours) ? `${hours.toFixed(1)} h` : "0.0 h";
 }
 
-function updateHourlyRateUI(hourlyRate, hourlyRateNight) {
+function updateHourlyRateUI(hourlyRate, hourlyRateNight, billingCutoffDay = DEFAULT_BILLING_CUTOFF_DAY) {
   const hourlyRateEl = document.getElementById("currentHourlyRate");
   const hourlyRateNightEl = document.getElementById("currentHourlyRateNight");
+  const billingCutoffEl = document.getElementById("currentBillingCutoffDay");
   if (hourlyRateEl) hourlyRateEl.textContent = formatCurrency(hourlyRate);
   if (hourlyRateNightEl) hourlyRateNightEl.textContent = formatCurrency(hourlyRateNight);
+  if (billingCutoffEl) billingCutoffEl.textContent = String(normalizeBillingCutoffDay(billingCutoffDay));
 }
 
 function getUserDisplayName(user) {
@@ -275,7 +347,10 @@ function buildSectorOptions(selectedValue = "", { allowLegacy = false } = {}) {
     sectors.push({ id: `legacy-${normalizedSelected}`, name: normalizedSelected, legacy: true });
   }
 
-  const options = ['<option value="">Seleccionar sector</option>'];
+  const placeholder = sectors.length
+    ? "Seleccionar sector"
+    : "Primero creá un sector en tu perfil";
+  const options = [`<option value="">${placeholder}</option>`];
   sectors.forEach((sector) => {
     const label = sector.legacy ? `${sector.name} (actual)` : sector.name;
     options.push(`<option value="${escapeHtml(sector.name)}">${escapeHtml(label)}</option>`);
@@ -307,7 +382,7 @@ function renderSectorList() {
   if (!sectorList) return;
 
   if (!currentUserSectors.length) {
-    sectorList.innerHTML = '<p class="empty-state">No tenés sectores configurados todavía.</p>';
+    sectorList.innerHTML = '<p class="empty-state">Todavía no creaste sectores. Agregá el primero para usarlo al cargar horas.</p>';
     return;
   }
 
@@ -323,21 +398,7 @@ function renderSectorList() {
     .join("");
 }
 
-async function ensureDefaultUserSectors() {
-  if (!USER_ID) return;
-
-  const payload = DEFAULT_USER_SECTORS.map((name) => ({
-    user_id: USER_ID,
-    name
-  }));
-
-  const { error } = await client.from("user_sectors").insert(payload);
-  if (error) {
-    throw error;
-  }
-}
-
-async function loadUserSectors({ seedDefaultsIfEmpty = true } = {}) {
+async function loadUserSectors() {
   if (!USER_ID) return;
 
   const { data, error } = await client
@@ -353,16 +414,6 @@ async function loadUserSectors({ seedDefaultsIfEmpty = true } = {}) {
     renderSectorSelects();
     showToast("No se pudieron cargar los sectores", "error");
     return;
-  }
-
-  if ((!data || !data.length) && seedDefaultsIfEmpty) {
-    try {
-      await ensureDefaultUserSectors();
-      await loadUserSectors({ seedDefaultsIfEmpty: false });
-      return;
-    } catch (seedError) {
-      console.error("No se pudieron crear sectores iniciales:", seedError);
-    }
   }
 
   currentUserSectors = (data || [])
@@ -438,10 +489,17 @@ async function apiFetch(path, options = {}) {
   }
 
   let response;
+  const requestUrl = url.toString();
+  console.info("[control-horas] Request", method, requestUrl, query || null);
   try {
-    response = await fetch(url.toString(), requestOptions);
+    response = await fetch(requestUrl, requestOptions);
   } catch (error) {
-    throw new Error("No se pudo conectar con el servidor");
+    console.error("[control-horas] Network error", {
+      method,
+      url: requestUrl,
+      error
+    });
+    throw new Error(`No se pudo conectar con el servidor (${requestUrl})`);
   }
 
   let data = null;
@@ -459,9 +517,16 @@ async function apiFetch(path, options = {}) {
 
   if (!response.ok) {
     const message = data?.error || data?.message || errorMessage;
+    console.error("[control-horas] HTTP error", {
+      method,
+      url: requestUrl,
+      status: response.status,
+      data
+    });
     throw new Error(message);
   }
 
+  console.info("[control-horas] Response OK", method, requestUrl, response.status);
   return data;
 }
 
@@ -522,6 +587,7 @@ async function cargarDashboard() {
     document.getElementById("normalHours").innerText = `${monthHoursNormal.toFixed(1)} h normales`;
     document.getElementById("nightHours").innerText = `${monthHoursNight.toFixed(1)} h nocturnas`;
     document.getElementById("periodo").innerText = getPayPeriodLabel(selectedMonth.month, selectedMonth.year);
+    updateDashboardPeriodNote();
 
     await cargarDetalle();
   } catch (error) {
@@ -949,6 +1015,7 @@ function fillProfileForm(profile) {
     profile?.hourly_rate !== null && profile?.hourly_rate !== undefined ? profile.hourly_rate : "";
   document.getElementById("profileHourlyRateNight").value =
     profile?.hourly_rate_night !== null && profile?.hourly_rate_night !== undefined ? profile.hourly_rate_night : "";
+  document.getElementById("profileBillingCutoffDay").value = normalizeBillingCutoffDay(profile?.billing_cutoff_day);
 }
 
 async function addSector() {
@@ -982,7 +1049,7 @@ async function addSector() {
     if (error) throw error;
 
     if (input) input.value = "";
-    await loadUserSectors({ seedDefaultsIfEmpty: false });
+    await loadUserSectors();
     showToast("Sector agregado", "success");
   } catch (error) {
     console.error("No se pudo agregar sector:", error);
@@ -1006,7 +1073,7 @@ async function deleteSector(sectorId, button) {
 
     if (error) throw error;
 
-    await loadUserSectors({ seedDefaultsIfEmpty: false });
+    await loadUserSectors();
     showToast("Sector eliminado", "success");
   } catch (error) {
     console.error("No se pudo eliminar sector:", error);
@@ -1034,8 +1101,10 @@ async function saveProfile() {
   try {
     const hourlyRateRaw = document.getElementById("profileHourlyRate")?.value || "";
     const hourlyRateNightRaw = document.getElementById("profileHourlyRateNight")?.value || "";
+    const billingCutoffDayRaw = document.getElementById("profileBillingCutoffDay")?.value || "";
     const hourlyRate = Number(hourlyRateRaw);
     const hourlyRateNight = Number(hourlyRateNightRaw);
+    const billingCutoffDay = Number(billingCutoffDayRaw);
 
     if (!hourlyRateRaw || !Number.isFinite(hourlyRate) || hourlyRate <= 0) {
       showToast("Ingresá un valor por hora normal válido", "error");
@@ -1047,13 +1116,19 @@ async function saveProfile() {
       return;
     }
 
+    if (!billingCutoffDayRaw || !Number.isInteger(billingCutoffDay) || billingCutoffDay < 1 || billingCutoffDay > 31) {
+      showToast("Ingresá un día de cierre mensual válido entre 1 y 31", "error");
+      return;
+    }
+
     const profile = {
       user_id: USER_ID,
       address: document.getElementById("profileAddress")?.value.trim() || null,
       phone: document.getElementById("profilePhone")?.value.trim() || null,
       birth_date: document.getElementById("profileBirthDate")?.value || null,
       hourly_rate: hourlyRate,
-      hourly_rate_night: hourlyRateNight
+      hourly_rate_night: hourlyRateNight,
+      billing_cutoff_day: billingCutoffDay
     };
 
     const { data, error } = await client
@@ -1066,7 +1141,12 @@ async function saveProfile() {
 
     currentProfile = data;
     fillProfileForm(currentProfile);
-    updateHourlyRateUI(currentProfile.hourly_rate, currentProfile.hourly_rate_night);
+    updateHourlyRateUI(
+      currentProfile.hourly_rate,
+      currentProfile.hourly_rate_night,
+      currentProfile.billing_cutoff_day
+    );
+    updateDashboardPeriodNote();
     if (selectedMonth) {
       await cargarDashboard();
     }
@@ -1093,7 +1173,8 @@ async function loadProfile() {
     showToast("No se pudo cargar el perfil", "error");
     currentProfile = null;
     fillProfileForm(null);
-    updateHourlyRateUI(null, null);
+    updateHourlyRateUI(null, null, DEFAULT_BILLING_CUTOFF_DAY);
+    updateDashboardPeriodNote();
     return;
   }
 
@@ -1108,7 +1189,8 @@ async function loadProfile() {
           phone: legacyProfile.phone || "",
           birth_date: legacyProfile.birthDate || "",
           hourly_rate: null,
-          hourly_rate_night: null
+          hourly_rate_night: null,
+          billing_cutoff_day: DEFAULT_BILLING_CUTOFF_DAY
         };
       }
     } catch (legacyError) {
@@ -1117,7 +1199,12 @@ async function loadProfile() {
   }
 
   fillProfileForm(currentProfile);
-  updateHourlyRateUI(currentProfile?.hourly_rate ?? null, currentProfile?.hourly_rate_night ?? null);
+  updateHourlyRateUI(
+    currentProfile?.hourly_rate ?? null,
+    currentProfile?.hourly_rate_night ?? null,
+    currentProfile?.billing_cutoff_day ?? DEFAULT_BILLING_CUTOFF_DAY
+  );
+  updateDashboardPeriodNote();
 }
 
 function renderCalendar() {
