@@ -518,6 +518,110 @@ PERFIL
 
 2. Cuando el usuario guarda perfil:
 - refrescar dashboard automáticamente
+
+--------------------------------
+ACTUALIZACION DE CONTINUIDAD - 30 MAR 2026
+--------------------------------
+
+Migracion de infraestructura realizada hoy:
+
+- Se elimino la dependencia operativa del servidor Ubuntu para produccion.
+- La app ya no depende de Render para el backend.
+- El proyecto ahora queda preparado para funcionar con:
+  - GitHub
+  - Netlify
+  - Supabase
+
+Estado operativo confirmado:
+
+- Repositorio Git actual:
+  - `https://github.com/digitalnexoweb/control-horas`
+- Sitio Netlify operativo actual:
+  - `https://appcontrolhoras.netlify.app/`
+- Produccion actual:
+  - frontend en Netlify
+  - backend en Netlify Functions
+  - auth y base de datos en Supabase
+
+Cambio tecnico principal de esta etapa:
+
+- El backend Express fue adaptado para ejecutarse tambien como Netlify Function.
+- Se creo:
+  - `netlify/functions/api.js`
+- Se agrego configuracion de Netlify en:
+  - `netlify.toml`
+- El frontend ya no apunta a Render ni a IPs locales.
+- `frontend/script.js` y `frontend/auth.js` ahora consumen la API desde:
+  - `/api`
+
+Archivos tocados en esta migracion:
+
+- `backend/server.js`
+- `backend/package.json`
+- `frontend/script.js`
+- `frontend/auth.js`
+- `package.json`
+- `package-lock.json`
+- `.nvmrc`
+- `netlify.toml`
+- `netlify/functions/api.js`
+
+Detalles importantes implementados:
+
+- Se fijo Node `20` para deploy.
+- La function responde correctamente en:
+  - `/.netlify/functions/api/health`
+- La ruta publica esperada queda en:
+  - `/api/...`
+- Se corrigio el `basePath` de la function para que `/api/*` funcione bien en Netlify.
+
+Nota importante sobre Netlify:
+
+- El sitio viejo `controlhorasapp` quedo descartado por bloqueos del plan con contributors en repo privado.
+- Se creo un sitio nuevo en Netlify para destrabar deploy:
+  - `appcontrolhoras`
+- Ese sitio nuevo fue el que termino publicando correctamente el commit actualizado.
+- Si mas adelante se quiere recuperar el nombre anterior, revisar `Domain management` del sitio nuevo.
+
+Variables de entorno que deben existir en el proyecto Netlify activo:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `APPROVAL_BASE_URL`
+- `ADMIN_APPROVAL_EMAIL`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_SECURE`
+- `MAIL_FROM`
+
+Validaciones reales hechas al finalizar:
+
+- el deploy nuevo en Netlify publico correctamente
+- desaparecio el error de `unrecognized Git contributor`
+- la API dejo de responder `404` en `/api/...`
+- el usuario confirmo que la app funciona correctamente en produccion
+
+Flujo de trabajo recomendado desde ahora:
+
+1. Abrir el proyecto local en:
+   - `/home/agus/control-horas`
+2. Editar archivos en local
+3. Hacer:
+   - `git add .`
+   - `git commit -m "mensaje"`
+   - `git push origin main`
+4. Netlify redeploya desde GitHub
+
+Importante para retomar despues:
+
+- La app ya no necesita Ubuntu para funcionar online.
+- Ubuntu/WSL solo queda como entorno local de desarrollo.
+- Los cambios quedan guardados:
+  - localmente en `/home/agus/control-horas`
+  - en GitHub luego de `git push`
+- Si se prueba desde Windows y no se encuentra la carpeta, recordar que el proyecto esta dentro de WSL.
 - refrescar visualmente los valores mostrados en cards
 
 3. Mantener compatibilidad con Supabase
