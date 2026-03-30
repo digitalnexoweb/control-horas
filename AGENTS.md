@@ -218,6 +218,63 @@ Siguiente paso sugerido al volver:
 
 - Evaluar si hace falta mejorar el onboarding cuando no hay sectores creados todavía.
 - Después evaluar mejora de navegación por año en la vista principal.
+
+---
+
+# Infraestructura actual
+
+Estado de deploy confirmado en esta etapa:
+
+- Repositorio Git actual:
+  - `https://github.com/digitalnexoweb/control-horas`
+- Frontend publicado en Netlify:
+  - `https://controlhorasapp.netlify.app/`
+- Backend publicado en Render:
+  - `https://control-horas-waxk.onrender.com`
+
+Configuración operativa elegida:
+
+- Netlify publica solo `frontend/`.
+- Render corre solo `backend/`.
+- El frontend ya apunta al backend nuevo de Render.
+
+Cambios realizados en esta etapa:
+
+- Se migró el proyecto desde la cuenta Git anterior a la cuenta nueva `digitalnexoweb`.
+- Se actualizó el remoto del repo local para usar el repositorio nuevo.
+- Se conectó Netlify al repositorio nuevo y se configuró para publicar el frontend estático.
+- Se creó/configuró un backend nuevo en Render apuntando al mismo repositorio.
+- Se corrigió el frontend para que use `https://control-horas-waxk.onrender.com` como API remota.
+- Se publicó una versión consistente del frontend para evitar mezcla de `index.html` viejo con `auth.js` nuevo.
+- Se publicaron también los favicons y assets visuales actualizados.
+
+Detalles importantes para no perder al retomar:
+
+- Si en Netlify vuelve a aparecer un frontend viejo o mezclado, revisar primero que el último deploy haya tomado:
+  - `frontend/index.html`
+  - `frontend/auth.js`
+  - `frontend/script.js`
+  - favicons y `site.webmanifest`
+- Si el login vuelve a fallar sin mensaje, sospechar desincronización entre `index.html` y `auth.js`.
+- Si el backend parece responder pero faltan endpoints nuevos, revisar que Render esté desplegando desde:
+  - `Root Directory: backend`
+  - `Build Command: npm install`
+  - `Start Command: npm start`
+
+Variables importantes de producción en Render:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `APPROVAL_BASE_URL=https://control-horas-waxk.onrender.com`
+- `CORS_ALLOWED_ORIGINS=https://controlhorasapp.netlify.app`
+
+Nota breve sobre limpieza del repo:
+
+- Ya quedaron versionados scripts locales de arranque y soporte:
+  - `package.json`
+  - `package-lock.json`
+  - `start.sh`
+  - `ecosystem.config.js`
 - Feb 2026
 - Mar 2026
 o equivalente claro en español.
