@@ -1,16 +1,29 @@
 {
   "name": "control-horas",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "./start.sh",
     "start:backend": "npm start --prefix backend",
     "start:frontend": "python3 -m http.server 8080 --directory frontend --bind 0.0.0.0",
+    "build": "echo 'Static frontend ready for Netlify'",
     "pm2:start": "npx pm2 start ecosystem.config.js",
     "pm2:restart": "npx pm2 restart ecosystem.config.js",
     "pm2:stop": "npx pm2 stop ecosystem.config.js",
     "pm2:delete": "npx pm2 delete ecosystem.config.js",
     "pm2:status": "npx pm2 status",
     "pm2:logs": "npx pm2 logs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.16.3",
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "pm2": "^6.0.14"

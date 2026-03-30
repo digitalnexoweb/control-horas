@@ -6,8 +6,6 @@ const supabaseKey = "sb_publishable_BMTlXGKImkkM_MuhH1t83g_bhNDsctI";
 
 const LAST_EMAIL_STORAGE_KEY = "controlHorasLastEmail";
 const SUPABASE_AUTH_STORAGE_KEY = "control-horas-auth";
-const REMOTE_API = "https://control-horas-waxk.onrender.com";
-const LOCAL_API_PORT = "3001";
 
 const browserStorage = {
   getItem(key) {
@@ -34,66 +32,8 @@ const browserStorage = {
   }
 };
 
-function isLoopbackHost(host) {
-  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
-}
-
-function isPrivateIpHost(host) {
-  return (
-    host.startsWith("100.") ||
-    host.startsWith("192.168.") ||
-    host.startsWith("10.") ||
-    host.startsWith("172.16.") ||
-    host.startsWith("172.17.") ||
-    host.startsWith("172.18.") ||
-    host.startsWith("172.19.") ||
-    host.startsWith("172.2") ||
-    host.startsWith("172.30.") ||
-    host.startsWith("172.31.")
-  );
-}
-
-function isTailnetDnsHost(host) {
-  return host.endsWith(".ts.net") || host.endsWith(".beta.tailscale.net");
-}
-
-function isSingleLabelHost(host) {
-  return /^[a-z0-9-]+$/i.test(host) && !host.includes(".");
-}
-
-function isPrivateOrTailnetHost(host) {
-  return isPrivateIpHost(host) || isTailnetDnsHost(host) || isSingleLabelHost(host);
-}
-
-function getLocalApiUrl(host) {
-  return `${window.location.protocol}//${host}:${LOCAL_API_PORT}`;
-}
-
 function resolveApiBaseUrl() {
-  const host = window.location.hostname;
-  const apiParam = new URLSearchParams(window.location.search).get("api");
-
-  if (apiParam === "local") {
-    return getLocalApiUrl(host);
-  }
-
-  if (apiParam === "remote") {
-    return REMOTE_API;
-  }
-
-  if (apiParam) {
-    try {
-      return new URL(apiParam).toString().replace(/\/$/, "");
-    } catch (error) {
-      console.warn("Parametro api invalido, se usara la API remota", error);
-    }
-  }
-
-  if (isLoopbackHost(host) || isPrivateOrTailnetHost(host)) {
-    return getLocalApiUrl(host);
-  }
-
-  return REMOTE_API;
+  return `${window.location.origin}/api`;
 }
 
 const API = resolveApiBaseUrl();

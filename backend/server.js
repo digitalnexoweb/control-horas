@@ -5,13 +5,15 @@ const cors = require("cors");
 const nodemailer = require("nodemailer");
 const { createClient } = require("@supabase/supabase-js");
 
-const app = express();
-
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminApprovalEmail = process.env.ADMIN_APPROVAL_EMAIL || "digitalnexoweb@gmail.com";
 const approvalBaseUrl = String(
-  process.env.APPROVAL_BASE_URL || process.env.RENDER_EXTERNAL_URL || ""
+  process.env.APPROVAL_BASE_URL ||
+    process.env.URL ||
+    process.env.DEPLOY_PRIME_URL ||
+    process.env.DEPLOY_URL ||
+    ""
 ).replace(/\/$/, "");
 const smtpHost = process.env.SMTP_HOST;
 const smtpPort = Number(process.env.SMTP_PORT || 587);
@@ -71,7 +73,7 @@ function isPrivateOrTailnetHostname(hostname) {
 }
 
 const allowedOrigins = new Set([
-  "https://control-horas-backend.onrender.com",
+  "https://controlhorasapp.netlify.app",
   "http://localhost:8080",
   "http://localhost:3000",
   "http://127.0.0.1:8080",
@@ -79,45 +81,50 @@ const allowedOrigins = new Set([
   ...configuredAllowedOrigins
 ]);
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
+function createApp() {
+  const app = express();
 
-      try {
-        const parsedOrigin = new URL(origin);
-        const hostname = parsedOrigin.hostname;
-        const isAllowed =
-          allowedOrigins.has(origin) ||
-          isNetlifyHostname(hostname) ||
-          isLoopbackOrigin(hostname) ||
-          isPrivateOrTailnetHostname(hostname);
-
-        if (isAllowed) {
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin) {
           return callback(null, true);
         }
 
-        console.warn("CORS bloqueado para origin:", origin);
-        return callback(new Error("Origen no permitido por CORS"));
-      } catch (error) {
-        console.warn("Origin invalido para CORS:", origin, error);
-        return callback(new Error("Origin invalido"));
+        try {
+          const parsedOrigin = new URL(origin);
+          const hostname = parsedOrigin.hostname;
+          const isAllowed =
+            allowedOrigins.has(origin) ||
+            isNetlifyHostname(hostname) ||
+            isLoopbackOrigin(hostname) ||
+            isPrivateOrTailnetHostname(hostname);
+
+          if (isAllowed) {
+            return callback(null, true);
+          }
+
+          console.warn("CORS bloqueado para origin:", origin);
+          return callback(new Error("Origen no permitido por CORS"));
+        } catch (error) {
+          console.warn("Origin invalido para CORS:", origin, error);
+          return callback(new Error("Origin invalido"));
+        }
       }
-    }
-  })
-);
-app.use(express.json());
+    })
+  );
+  app.use(express.json());
 
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} origin=${req.headers.origin || "n/a"}`);
-  next();
-});
+  app.use((req, res, next) => {
+    console.log(
+      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} origin=${req.headers.origin || "n/a"}`
+    );
+    next();
+  });
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true });
-});
+  app.get("/health", (_req, res) => {
+    res.json({ ok: true });
+  });
 
 function roundTo(value, decimals = 2) {
   const factor = 10 ** decimals;
@@ -631,11 +638,11 @@ function hydrateHoursRow(row) {
   };
 }
 
-app.get("/", (req, res) => {
-  res.send("Backend Supabase OK");
-});
+  app.get("/", (req, res) => {
+    res.send("Backend Supabase OK");
+  });
 
-app.post("/auth/register-request", async (req, res) => {
+  app.post("/auth/register-request", async (req, res) => {
   const email = String(req.body?.email || "")
     .trim()
     .toLowerCase();
@@ -746,9 +753,9 @@ app.post("/auth/register-request", async (req, res) => {
     status: "pending",
     message: "Solicitud enviada. Un administrador debe aprobar tu acceso."
   });
-});
+  });
 
-app.get("/auth/approval-status", async (req, res) => {
+  app.get("/auth/approval-status", async (req, res) => {
   const { user_id: userId } = req.query;
 
   if (!isValidUuid(userId)) {
@@ -766,9 +773,9 @@ app.get("/auth/approval-status", async (req, res) => {
   } catch (error) {
     return sendServerError(res, "Error consultando estado de aprobacion", error);
   }
-});
+  });
 
-app.get("/auth/approve-user", async (req, res) => {
+  app.get("/auth/approve-user", async (req, res) => {
   const approvalToken = String(req.query?.token || "").trim();
 
   if (!isValidUuid(approvalToken)) {
@@ -840,9 +847,9 @@ app.get("/auth/approve-user", async (req, res) => {
     console.error("Error aprobando usuario", error);
     return res.status(500).send("No se pudo aprobar el usuario");
   }
-});
+  });
 
-app.post("/add-hours", async (req, res) => {
+  app.post("/add-hours", async (req, res) => {
   const validation = validateHourPayload(req.body);
   if (!validation.ok) {
     return sendClientError(res, validation.status, validation.error);
@@ -920,9 +927,9 @@ app.post("/add-hours", async (req, res) => {
     worked_hours_normal: financials.worked_hours_normal,
     worked_hours_night: financials.worked_hours_night
   });
-});
+  });
 
-app.get("/resumen", async (req, res) => {
+  app.get("/resumen", async (req, res) => {
   const { user_id } = req.query;
 
   if (!isValidUuid(user_id)) {
@@ -995,9 +1002,9 @@ app.get("/resumen", async (req, res) => {
   });
 
   res.json(resumen);
-});
+  });
 
-app.get("/hours-by-month", async (req, res) => {
+  app.get("/hours-by-month", async (req, res) => {
   const { year, month, user_id } = req.query;
 
   if (!isValidUuid(user_id)) {
@@ -1060,9 +1067,9 @@ app.get("/hours-by-month", async (req, res) => {
     period_end: end,
     registros
   });
-});
+  });
 
-app.get("/hours-by-calendar-month", async (req, res) => {
+  app.get("/hours-by-calendar-month", async (req, res) => {
   const { year, month, user_id } = req.query;
 
   if (!isValidUuid(user_id)) {
@@ -1101,9 +1108,9 @@ app.get("/hours-by-calendar-month", async (req, res) => {
   }
 
   res.json({ registros: (data || []).map(hydrateHoursRow) });
-});
+  });
 
-app.delete("/delete-hour/:id", async (req, res) => {
+  app.delete("/delete-hour/:id", async (req, res) => {
   const { id } = req.params;
   const { user_id } = req.body || {};
 
@@ -1142,9 +1149,9 @@ app.delete("/delete-hour/:id", async (req, res) => {
   }
 
   res.json({ ok: true });
-});
+  });
 
-app.put("/update-hour/:id", async (req, res) => {
+  app.put("/update-hour/:id", async (req, res) => {
   const { id } = req.params;
   const hourId = Number(id);
 
@@ -1244,9 +1251,18 @@ app.put("/update-hour/:id", async (req, res) => {
     ok: true,
     registro: hydrated
   });
-});
+  });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor Supabase corriendo en 0.0.0.0:${PORT}`);
-});
+  return app;
+}
+
+const app = createApp();
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Servidor Supabase corriendo en 0.0.0.0:${PORT}`);
+  });
+}
+
+module.exports = { app, createApp };
