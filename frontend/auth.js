@@ -6,6 +6,8 @@ const supabaseKey = "sb_publishable_BMTlXGKImkkM_MuhH1t83g_bhNDsctI";
 
 const LAST_EMAIL_STORAGE_KEY = "controlHorasLastEmail";
 const SUPABASE_AUTH_STORAGE_KEY = "control-horas-auth";
+const AUTH_CONNECTION_ERROR_MESSAGE =
+  "No se pudo conectar con Supabase Auth. Revisá que el proyecto de Supabase esté activo y que la URL configurada siga vigente.";
 
 const browserStorage = {
   getItem(key) {
@@ -62,6 +64,17 @@ function notify(message, type = "error") {
 
   console[type === "error" ? "error" : "log"]("[control-horas][auth]", message);
   alert(message);
+}
+
+function isAuthConnectionError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("fetch failed") ||
+    message.includes("networkerror") ||
+    message.includes("network error") ||
+    message.includes("load failed")
+  );
 }
 
 function setAuthVisibility(isAuthenticated) {
@@ -143,7 +156,8 @@ async function authApiFetch(path, options = {}) {
   try {
     response = await fetch(url.toString(), requestOptions);
   } catch (error) {
-    throw new Error(errorMessage);
+    console.error("[control-horas][auth] Network error", error);
+    throw new Error(`${errorMessage}. Revisá la conexión con el servidor.`);
   }
 
   const contentType = response.headers.get("content-type") || "";
@@ -309,7 +323,7 @@ async function login() {
 
   if (error) {
     console.error("[control-horas][auth] signInWithPassword error", error);
-    notify(error.message, "error");
+    notify(isAuthConnectionError(error) ? AUTH_CONNECTION_ERROR_MESSAGE : error.message, "error");
   } else {
     const hasAccess = await enforceApprovedAccess(data.user);
     if (!hasAccess) {

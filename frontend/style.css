@@ -973,6 +973,83 @@ button:focus-visible,
   display: none !important;
 }
 
+.calendar-day-detail {
+  margin-top: 12px;
+  border: 1px solid #d7e3fb;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.calendar-day-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.calendar-day-detail-label {
+  display: block;
+  margin-bottom: 3px;
+  color: #64799f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.calendar-day-detail-head h4 {
+  color: #12284d;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.calendar-day-detail-head strong {
+  color: #10244a;
+  font-size: 1.2rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.calendar-day-detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.calendar-day-detail-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e3ebf9;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 10px;
+}
+
+.calendar-day-detail-item strong,
+.calendar-day-detail-item span {
+  display: block;
+}
+
+.calendar-day-detail-item strong {
+  color: #172f58;
+  font-size: 0.92rem;
+}
+
+.calendar-day-detail-item span {
+  margin-top: 2px;
+  color: #5b6f91;
+  font-size: 0.82rem;
+}
+
+.calendar-day-detail-item b {
+  color: #10244a;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
 .calendar-quick-form {
   margin-top: 12px;
   border: 1px solid #d7e3fb;
@@ -1411,8 +1488,30 @@ body.dark-mode .calendar-quick-form {
   border-color: #2d436f;
 }
 
+body.dark-mode .calendar-day-detail {
+  background: #0f1b32;
+  border-color: #2d436f;
+}
+
+body.dark-mode .calendar-day-detail-label,
 body.dark-mode .calendar-quick-head p {
   color: #b7cdf8;
+}
+
+body.dark-mode .calendar-day-detail-head h4,
+body.dark-mode .calendar-day-detail-head strong,
+body.dark-mode .calendar-day-detail-item strong,
+body.dark-mode .calendar-day-detail-item b {
+  color: #e0ebff;
+}
+
+body.dark-mode .calendar-day-detail-item {
+  background: #111f39;
+  border-color: #263c65;
+}
+
+body.dark-mode .calendar-day-detail-item span {
+  color: #a9bbdc;
 }
 
 body.dark-mode .cal-weekday {

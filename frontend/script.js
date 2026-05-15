@@ -40,6 +40,7 @@ let graficoMensualInstance = null;
 let currentMonthRegistros = [];
 let calendarView = null;
 let calendarWorkedDays = new Set();
+let calendarMonthRegistros = [];
 let calendarSelectedDate = "";
 let toastTimeout = null;
 let currentProfile = null;
@@ -1176,6 +1177,76 @@ function renderCalendar() {
   container.innerHTML = html;
 }
 
+function getCalendarSourceRegistros() {
+  const sameVisibleMonth =
+    calendarView &&
+    selectedMonth &&
+    Number(calendarView.month) === Number(selectedMonth.month) &&
+    Number(calendarView.year) === Number(selectedMonth.year);
+
+  if (!sameVisibleMonth || !currentMonthRegistros.length) {
+    return calendarMonthRegistros;
+  }
+
+  const byId = new Map();
+  calendarMonthRegistros.forEach((registro) => byId.set(String(registro.id), registro));
+  currentMonthRegistros
+    .filter((registro) => {
+      const [year, month] = String(registro.date || "").split("-");
+      return Number(year) === Number(calendarView.year) && Number(month) === Number(calendarView.month);
+    })
+    .forEach((registro) => byId.set(String(registro.id), registro));
+
+  return Array.from(byId.values());
+}
+
+function getCalendarDayRegistros(isoDate) {
+  return getCalendarSourceRegistros()
+    .filter((registro) => registro.date === isoDate)
+    .sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
+}
+
+function renderCalendarDayDetail(isoDate) {
+  const detail = document.getElementById("calendarDayDetail");
+  if (!detail) return;
+
+  const registros = getCalendarDayRegistros(isoDate);
+  if (!isoDate || !registros.length) {
+    detail.classList.add("hidden");
+    detail.innerHTML = "";
+    return;
+  }
+
+  const total = registros.reduce((sum, registro) => sum + (Number(registro.money) || 0), 0);
+  const dateLabel = formatDateLatam(isoDate);
+
+  detail.innerHTML = `
+    <div class="calendar-day-detail-head">
+      <div>
+        <span class="calendar-day-detail-label">Detalle del dia</span>
+        <h4>${dateLabel}</h4>
+      </div>
+      <strong>${formatMoneyCompact(total)}</strong>
+    </div>
+    <div class="calendar-day-detail-list">
+      ${registros
+        .map(
+          (registro) => `
+            <article class="calendar-day-detail-item">
+              <div>
+                <strong>${formatTimeLabel(registro.start_time)} - ${formatTimeLabel(registro.end_time)}</strong>
+                <span>${escapeHtml(registro.sector || "-")}</span>
+              </div>
+              <b>${formatMoneyCompact(registro.money)}</b>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+  detail.classList.remove("hidden");
+}
+
 function handleCalendarDayClick(event) {
   const dayButton = event.target.closest(".cal-day[data-date]");
   if (!dayButton) return;
@@ -1185,6 +1256,7 @@ function handleCalendarDayClick(event) {
 function openCalendarHourForm(isoDate) {
   calendarSelectedDate = isoDate;
   renderCalendar();
+  renderCalendarDayDetail(isoDate);
 
   const quickForm = document.getElementById("calendarQuickForm");
   const dateIsoInput = document.getElementById("calendarQuickDateIso");
@@ -1201,9 +1273,14 @@ function openCalendarHourForm(isoDate) {
 
 function closeCalendarHourForm() {
   const quickForm = document.getElementById("calendarQuickForm");
+  const detail = document.getElementById("calendarDayDetail");
   if (!quickForm) return;
 
   quickForm.classList.add("hidden");
+  if (detail) {
+    detail.classList.add("hidden");
+    detail.innerHTML = "";
+  }
   calendarSelectedDate = "";
   document.getElementById("calendarQuickDateIso").value = "";
   document.getElementById("calendarQuickStart").value = "";
@@ -1246,14 +1323,17 @@ async function refreshCalendarFromControls() {
       query: { user_id: USER_ID, year, month },
       errorMessage: "No se pudo cargar el calendario"
     });
-    calendarWorkedDays = new Set((data?.registros || []).map((row) => Number(row.date.slice(8, 10))));
+    calendarMonthRegistros = data?.registros || [];
+    calendarWorkedDays = new Set(calendarMonthRegistros.map((row) => Number(row.date.slice(8, 10))));
   } catch (error) {
     console.error("Error cargando calendario:", error);
+    calendarMonthRegistros = [];
     calendarWorkedDays = new Set();
     showToast(error.message || "No se pudo cargar el calendario", "error");
   }
 
   renderCalendar();
+  renderCalendarDayDetail(calendarSelectedDate);
 }
 
 function getReceiptKey() {
