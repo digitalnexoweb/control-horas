@@ -23,22 +23,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify Cloudflare token
+      - name: Check Cloudflare auth and account
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "ERROR: CLOUDFLARE_API_TOKEN secret is empty or missing"
-            echo "Go to GitHub repo Settings > Secrets > Actions and add CLOUDFLARE_API_TOKEN"
-            exit 1
-          fi
-          echo "Token present (length: ${#CLOUDFLARE_API_TOKEN})"
-          curl -s -o /dev/null -w "Token verify HTTP status: %{http_code}\n" \
-            "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          echo "=== wrangler whoami ==="
+          npx wrangler whoami
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Deploy to Cloudflare Workers
-        run: npx wrangler deploy
+        run: |
+          set -o pipefail
+          npx wrangler deploy 2>&1 | tee /tmp/wrangler.log
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: dcc0d20b31d72697d08cceb304de76c4
+
+      - name: Upload deploy log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wrangler-error-log
+          path: /tmp/wrangler.log
+          retention-days: 1
