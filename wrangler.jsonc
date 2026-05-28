@@ -16,11 +16,13 @@
   ],
   "vars": {
     "SUPABASE_URL": "https://kslcypddazdiqnvnubrx.supabase.co",
+    "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbGN5cGRkYXpkaXFudm51YnJ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTI3Mzc5MSwiZXhwIjoyMDg2ODQ5NzkxfQ.neLdUYtENzIAgfSRf1xODpg7Z3ApgADP5LYy9jIxKPA",
     "ADMIN_APPROVAL_EMAIL": "digitalnexoweb@gmail.com",
     "SMTP_HOST": "smtp.resend.com",
     "SMTP_PORT": "465",
     "SMTP_USER": "resend",
     "SMTP_SECURE": "true",
+    "SMTP_PASS": "re_fM2v2smr_8jTk2MUTuT7NuwQBthwQDKaJ",
     "MAIL_FROM": "Control Horas <onboarding@resend.dev>"
   }
 }
