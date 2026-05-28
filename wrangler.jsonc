@@ -13,5 +13,14 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "vars": {
+    "SUPABASE_URL": "https://kslcypddazdiqnvnubrx.supabase.co",
+    "ADMIN_APPROVAL_EMAIL": "digitalnexoweb@gmail.com",
+    "SMTP_HOST": "smtp.resend.com",
+    "SMTP_PORT": "465",
+    "SMTP_USER": "resend",
+    "SMTP_SECURE": "true",
+    "MAIL_FROM": "Control Horas <onboarding@resend.dev>"
+  }
 }
