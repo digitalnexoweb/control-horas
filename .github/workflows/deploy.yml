@@ -14,34 +14,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Check Cloudflare auth and account
-        run: |
-          echo "=== wrangler whoami ==="
-          npx wrangler whoami
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
       - name: Deploy to Cloudflare Workers
-        run: |
-          set -o pipefail
-          npx wrangler deploy 2>&1 | tee /tmp/wrangler.log
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: dcc0d20b31d72697d08cceb304de76c4
-
-      - name: Upload deploy log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wrangler-error-log
-          path: /tmp/wrangler.log
-          retention-days: 1
