@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "control-horas",
+  "account_id": "dcc0d20b31d72697d08cceb304de76c4",
   "main": "src/worker.js",
   "compatibility_date": "2026-05-28",
   "observability": {
