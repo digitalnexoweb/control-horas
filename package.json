@@ -8,13 +8,15 @@
     "start": "./start.sh",
     "start:backend": "npm start --prefix backend",
     "start:frontend": "python3 -m http.server 8080 --directory frontend --bind 0.0.0.0",
-    "build": "echo 'Static frontend ready for Netlify'",
+    "build": "node -e \"if(process.env.CLOUDFLARE_API_TOKEN){require('child_process').execSync('npx wrangler deploy',{stdio:'inherit'})}else{console.log('Build ready')}\"",
     "pm2:start": "npx pm2 start ecosystem.config.js",
     "pm2:restart": "npx pm2 restart ecosystem.config.js",
     "pm2:stop": "npx pm2 stop ecosystem.config.js",
     "pm2:delete": "npx pm2 delete ecosystem.config.js",
     "pm2:status": "npx pm2 status",
-    "pm2:logs": "npx pm2 logs"
+    "pm2:logs": "npx pm2 logs",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
@@ -26,6 +28,7 @@
     "serverless-http": "^3.2.0"
   },
   "devDependencies": {
-    "pm2": "^6.0.14"
+    "pm2": "^6.0.14",
+    "wrangler": "^4.95.0"
   }
 }

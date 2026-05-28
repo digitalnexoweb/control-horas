@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "control-horas",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-05-28",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "frontend",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "SUPABASE_URL": "https://kslcypddazdiqnvnubrx.supabase.co",
+    "APPROVAL_BASE_URL": "https://control-horas.digitalnexoweb.workers.dev",
+    "ADMIN_APPROVAL_EMAIL": "digitalnexoweb@gmail.com",
+    "SMTP_HOST": "smtp.resend.com",
+    "SMTP_PORT": "465",
+    "SMTP_USER": "resend",
+    "SMTP_SECURE": "true",
+    "MAIL_FROM": "Control Horas <onboarding@resend.dev>"
+  }
+}
