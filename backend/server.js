@@ -84,6 +84,57 @@ const allowedOrigins = new Set([
   ...configuredAllowedOrigins
 ]);
 
+function jsonBodyParser(req, res, next) {
+  const methodAllowsBody = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+  const contentType = String(req.headers["content-type"] || "").toLowerCase();
+  const expectsJson = contentType.includes("application/json") || contentType.includes("+json");
+
+  req.body = {};
+
+  if (!methodAllowsBody || !expectsJson) {
+    next();
+    return;
+  }
+
+  const chunks = [];
+  let receivedBytes = 0;
+  const maxBytes = 1024 * 1024;
+
+  req.on("data", (chunk) => {
+    receivedBytes += chunk.length;
+
+    if (receivedBytes > maxBytes) {
+      res.status(413).json({ error: "El cuerpo de la solicitud es demasiado grande" });
+      req.destroy();
+      return;
+    }
+
+    chunks.push(chunk);
+  });
+
+  req.on("end", () => {
+    const rawBody = Buffer.concat(chunks).toString("utf8").trim();
+
+    if (!rawBody) {
+      next();
+      return;
+    }
+
+    try {
+      req.body = JSON.parse(rawBody);
+      next();
+    } catch (error) {
+      res.status(400).json({ error: "JSON invalido en la solicitud" });
+    }
+  });
+
+  req.on("error", () => {
+    if (!res.headersSent) {
+      res.status(400).json({ error: "No se pudo leer la solicitud" });
+    }
+  });
+}
+
 function createApp() {
   const app = express();
 
@@ -117,7 +168,7 @@ function createApp() {
       }
     })
   );
-  app.use(express.json());
+  app.use(jsonBodyParser);
 
   app.use((req, res, next) => {
     console.log(

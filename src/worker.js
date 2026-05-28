@@ -1,27 +1,89 @@
 /**
- * Cloudflare Worker entry point (ES Module format)
+ * Cloudflare Worker entry point.
  *
- * Uses static ESM imports so esbuild bundles Express + Supabase
- * and all dependencies directly into the Worker script.
- * createRequire is NOT used — it leaves deps as runtime requires
- * which fail in Workers (no node_modules at runtime).
+ * Static assets are served by Workers Assets. API requests are routed to the
+ * existing Express backend through Cloudflare's Node HTTP bridge.
  */
-import serverless from "serverless-http";
-import serverModule from "../backend/server.js";
+import { createServer } from "node:http";
+import { handleAsNodeRequest } from "cloudflare:node";
 
-const { app } = serverModule;
-const handler = serverless(app, { basePath: "/api" });
+const API_PORT = 8080;
+let serverPromise;
+
+function populateProcessEnv(env) {
+  if (!globalThis.process) {
+    return;
+  }
+
+  globalThis.process.env = globalThis.process.env || {};
+
+  Object.entries(env || {}).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      globalThis.process.env[key] = value;
+    }
+  });
+}
+
+async function createApiServer(env) {
+  populateProcessEnv(env);
+
+  const processVersions = globalThis.process && globalThis.process.versions;
+  const originalNodeVersion = processVersions && processVersions.node;
+
+  if (processVersions) {
+    try {
+      Object.defineProperty(processVersions, "node", {
+        value: undefined,
+        configurable: true
+      });
+    } catch (error) {
+      processVersions.node = undefined;
+    }
+  }
+
+  const serverModule = await import("../backend/server.js");
+
+  if (processVersions && originalNodeVersion) {
+    try {
+      Object.defineProperty(processVersions, "node", {
+        value: originalNodeVersion,
+        configurable: true
+      });
+    } catch (error) {
+      processVersions.node = originalNodeVersion;
+    }
+  }
+
+  const { app } = serverModule.default || serverModule;
+  const server = createServer(app);
+  server.listen(API_PORT);
+
+  return server;
+}
+
+function getApiServer(env) {
+  if (!serverPromise) {
+    serverPromise = createApiServer(env);
+  }
+
+  return serverPromise;
+}
+
+function stripApiPrefix(request) {
+  const url = new URL(request.url);
+  url.pathname = url.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
+  return new Request(url.toString(), request);
+}
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Route all /api/* requests to Express backend
     if (url.pathname.startsWith("/api/")) {
-      return handler(request);
+      await getApiServer(env);
+      return handleAsNodeRequest(API_PORT, stripApiPrefix(request));
     }
 
-    // Serve static frontend (SPA fallback via not_found_handling in wrangler.jsonc)
     return env.ASSETS.fetch(request);
   }
 };
