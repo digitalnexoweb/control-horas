@@ -2,7 +2,7 @@ require("dotenv").config();
 const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
-const nodemailer = require("nodemailer");
+// Email enviado via Resend HTTP API (compatible con Cloudflare Workers)
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -31,7 +31,6 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-let mailTransporter = null;
 
 function isLoopbackOrigin(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
@@ -58,6 +57,10 @@ function isTailnetDnsHostname(hostname) {
 
 function isNetlifyHostname(hostname) {
   return hostname.endsWith(".netlify.app") || hostname.endsWith(".netlify.live");
+}
+
+function isCloudflareHostname(hostname) {
+  return hostname.endsWith(".pages.dev") || hostname.endsWith(".workers.dev");
 }
 
 function isSingleLabelHostname(hostname) {
@@ -97,6 +100,7 @@ function createApp() {
           const isAllowed =
             allowedOrigins.has(origin) ||
             isNetlifyHostname(hostname) ||
+            isCloudflareHostname(hostname) ||
             isLoopbackOrigin(hostname) ||
             isPrivateOrTailnetHostname(hostname);
 
@@ -348,24 +352,36 @@ function sanitizeOptionalPhone(value) {
   return normalized.slice(0, 40);
 }
 
-function getMailTransporter() {
-  if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !mailFrom) {
-    return null;
+function getResendApiKey() {
+  // Soporta variable dedicada RESEND_API_KEY, o SMTP_PASS cuando SMTP_HOST es smtp.resend.com
+  return (
+    process.env.RESEND_API_KEY ||
+    (smtpHost === "smtp.resend.com" ? smtpPass : null) ||
+    null
+  );
+}
+
+async function sendEmailViaResend({ from, to, subject, text, html }) {
+  const apiKey = getResendApiKey();
+  if (!apiKey) {
+    throw new Error("No hay API key de Resend configurada (RESEND_API_KEY o SMTP_PASS con SMTP_HOST=smtp.resend.com)");
   }
 
-  if (!mailTransporter) {
-    mailTransporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpSecure,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass
-      }
-    });
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ from, to: [to], subject, text, html })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "(sin cuerpo)");
+    throw new Error(`Error de Resend API ${response.status}: ${errorBody}`);
   }
 
-  return mailTransporter;
+  return response.json().catch(() => ({}));
 }
 
 function ensureApprovalEmailConfig() {
@@ -373,8 +389,12 @@ function ensureApprovalEmailConfig() {
     throw new Error("Falta APPROVAL_BASE_URL en el entorno");
   }
 
-  if (!getMailTransporter()) {
-    throw new Error("Faltan variables SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS o MAIL_FROM");
+  if (!getResendApiKey()) {
+    throw new Error("Falta RESEND_API_KEY (o SMTP_PASS con SMTP_HOST=smtp.resend.com) para enviar emails de aprobacion");
+  }
+
+  if (!mailFrom) {
+    throw new Error("Falta MAIL_FROM en el entorno");
   }
 }
 
@@ -460,7 +480,6 @@ async function sendAdminApprovalEmail({ email, userId, approvalToken, requestedA
   ensureApprovalEmailConfig();
 
   const approvalUrl = `${approvalBaseUrl}/auth/approve-user?token=${encodeURIComponent(approvalToken)}`;
-  const transporter = getMailTransporter();
   const safeEmail = escapeHtml(email);
   const safeUserId = escapeHtml(userId);
   const safeRequestedAt = escapeHtml(requestedAt);
@@ -468,7 +487,7 @@ async function sendAdminApprovalEmail({ email, userId, approvalToken, requestedA
   const safeInstitution = escapeHtml(institution || "No informada");
   const safeMessage = escapeHtml(message || "Sin mensaje");
 
-  await transporter.sendMail({
+  await sendEmailViaResend({
     from: mailFrom,
     to: adminApprovalEmail,
     subject: `Nuevo usuario pendiente de aprobacion: ${email}`,
