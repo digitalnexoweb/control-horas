@@ -6,3 +6,9 @@ database.db
 .env
 backend/.env
 frontend/config.local.js
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
