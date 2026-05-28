@@ -39,11 +39,13 @@ function Require-CloudflareAuth {
   }
 
   $whoamiOutput = npx wrangler whoami 2>&1
-  if ($LASTEXITCODE -ne 0) {
+  $whoamiText = ($whoamiOutput | Out-String)
+
+  if ($LASTEXITCODE -ne 0 -or $whoamiText -match "not authenticated") {
     throw "Falta autenticacion de Cloudflare. Ejecuta 'npx wrangler login' o define CLOUDFLARE_API_TOKEN para esta terminal."
   }
 
-  Write-Host $whoamiOutput
+  Write-Host $whoamiText
 }
 
 function Set-WorkerSecretFromEnv {
