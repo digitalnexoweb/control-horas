@@ -13,8 +13,7 @@
     "not_found_handling": "single-page-application"
   },
   "compatibility_flags": [
-    "nodejs_compat",
-    "enable_nodejs_http_server_modules"
+    "nodejs_compat"
   ],
   "vars": {
     "SUPABASE_URL": "https://kslcypddazdiqnvnubrx.supabase.co",
