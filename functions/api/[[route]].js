@@ -1,24 +1,16 @@
 /**
- * Cloudflare Worker entry point (Native Workers API)
+ * Cloudflare Pages Functions API handler
  *
- * No Express, no serverless-http — pure Workers routing with if/else.
+ * Captures all /api/* routes with [[route]] dynamic segment.
  * Uses Resend HTTP API via fetch (no nodemailer).
  */
 import { createClient } from "@supabase/supabase-js";
 
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-
-    // API routes → Native Workers handlers
-    if (url.pathname.startsWith("/api/")) {
-      return handleApi(request, url, env);
-    }
-
-    // Static frontend (SPA fallback via not_found_handling)
-    return env.ASSETS.fetch(request);
-  }
-};
+export async function onRequest(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  return handleApi(request, url, env);
+}
 
 // ============================================================================
 // CORS & Utilities
