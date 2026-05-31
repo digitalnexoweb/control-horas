@@ -39,10 +39,6 @@ function isTailnetDnsHostname(hostname) {
   return hostname.endsWith(".ts.net") || hostname.endsWith(".beta.tailscale.net");
 }
 
-function isNetlifyHostname(hostname) {
-  return hostname.endsWith(".netlify.app") || hostname.endsWith(".netlify.live");
-}
-
 function isCloudflareHostname(hostname) {
   return hostname.endsWith(".pages.dev") || hostname.endsWith(".workers.dev");
 }
@@ -63,7 +59,6 @@ function isAllowedOrigin(origin, env) {
   if (!origin) return true;
 
   const allowedOrigins = new Set([
-    "https://controlhorasapp.netlify.app",
     "http://localhost:8080",
     "http://localhost:3000",
     "http://127.0.0.1:8080",
@@ -76,7 +71,6 @@ function isAllowedOrigin(origin, env) {
     const hostname = parsedOrigin.hostname;
     return (
       allowedOrigins.has(origin) ||
-      isNetlifyHostname(hostname) ||
       isCloudflareHostname(hostname) ||
       isLoopbackOrigin(hostname) ||
       isPrivateOrTailnetHostname(hostname)

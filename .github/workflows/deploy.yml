@@ -27,4 +27,4 @@ jobs:
         run: npx wrangler pages deploy frontend --project-name=control-horas
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: dcc0d20b31d72697d08cceb304de76c4
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

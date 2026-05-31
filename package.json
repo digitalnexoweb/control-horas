@@ -2,21 +2,12 @@
   "name": "control-horas",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
-    "start": "./start.sh",
-    "start:backend": "npm start --prefix backend",
-    "start:frontend": "python3 -m http.server 8080 --directory frontend --bind 0.0.0.0",
     "build": "echo 'Build ready'",
-    "pm2:start": "npx pm2 start ecosystem.config.js",
-    "pm2:restart": "npx pm2 restart ecosystem.config.js",
-    "pm2:stop": "npx pm2 stop ecosystem.config.js",
-    "pm2:delete": "npx pm2 delete ecosystem.config.js",
-    "pm2:status": "npx pm2 status",
-    "pm2:logs": "npx pm2 logs",
-    "deploy": "wrangler deploy",
-    "preview": "wrangler dev"
+    "deploy": "wrangler pages deploy frontend --project-name=control-horas",
+    "preview": "wrangler pages dev frontend"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3"
