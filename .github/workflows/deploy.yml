@@ -24,7 +24,7 @@ jobs:
         run: npm ci
 
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy frontend --project-name=control-horas
+        run: npx wrangler pages deploy frontend --project-name=control-horas-eds
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: dcc0d20b31d72697d08cceb304de76c4
