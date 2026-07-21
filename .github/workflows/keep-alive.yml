@@ -1,0 +1,39 @@
+name: Keep Supabase Alive
+
+# Mantiene el proyecto de Supabase (plan free) activo para que no se
+# auto-pause tras ~7 dias sin actividad. Corre cada 3 dias y hace una
+# query real a la REST API, que cuenta como actividad de base de datos.
+#
+# Usa la publishable key (ya publica en frontend/auth.js), asi que no
+# necesita ningun secret configurado en el repo.
+
+on:
+  schedule:
+    - cron: "0 6 */3 * *" # cada 3 dias, 06:00 UTC (~03:00 ART)
+  workflow_dispatch: # permite dispararlo a mano desde la pestaña Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    name: Ping Supabase
+    steps:
+      - name: Query Supabase REST API
+        env:
+          SUPABASE_URL: "https://kslcypddazdiqnvnubrx.supabase.co"
+          SUPABASE_KEY: "sb_publishable_BMTlXGKImkkM_MuhH1t83g_bhNDsctI"
+        run: |
+          echo "Pinging Supabase to keep the project active..."
+          code=$(curl -s -o /tmp/body.txt -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/rest/v1/hours?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          echo "HTTP $code"
+          cat /tmp/body.txt
+          echo ""
+          # 2xx = la base respondio y proceso la query -> proyecto activo.
+          if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+            echo "OK: Supabase respondio correctamente."
+          else
+            echo "ERROR: Supabase no respondio con 2xx. Revisar el proyecto."
+            exit 1
+          fi
