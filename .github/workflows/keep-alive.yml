@@ -1,39 +1,70 @@
 name: Keep Supabase Alive
 
 # Mantiene el proyecto de Supabase (plan free) activo para que no se
-# auto-pause tras ~7 dias sin actividad. Corre cada 3 dias y hace una
-# query real a la REST API, que cuenta como actividad de base de datos.
+# auto-pause por inactividad.
 #
-# Usa la publishable key (ya publica en frontend/auth.js), asi que no
-# necesita ningun secret configurado en el repo.
+# IMPORTANTE: un GET de lectura NO alcanza para resetear el contador de
+# inactividad de Supabase (se comprobo: los pings devolvian 2xx y el
+# proyecto se pauso igual). Por eso hacemos una ESCRITURA real a una
+# tabla dedicada `keep_alive`, que si cuenta como actividad de base.
+#
+# Requiere:
+#   - Tabla public.keep_alive (ver SQL en el repo / README).
+#   - Secret del repo SUPABASE_SERVICE_ROLE_KEY (service_role, la secreta).
 
 on:
   schedule:
-    - cron: "0 6 */3 * *" # cada 3 dias, 06:00 UTC (~03:00 ART)
-  workflow_dispatch: # permite dispararlo a mano desde la pestaña Actions
+    - cron: "0 6 * * *" # todos los dias 06:00 UTC (~03:00 ART), margen amplio
+  workflow_dispatch: # disparo manual desde la pestaña Actions
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     name: Ping Supabase
     steps:
-      - name: Query Supabase REST API
+      - name: Write to Supabase (real DB activity)
         env:
           SUPABASE_URL: "https://kslcypddazdiqnvnubrx.supabase.co"
-          SUPABASE_KEY: "sb_publishable_BMTlXGKImkkM_MuhH1t83g_bhNDsctI"
+          SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "Pinging Supabase to keep the project active..."
+          set +e
+          if [ -z "$SERVICE_ROLE_KEY" ]; then
+            echo "ERROR: falta el secret SUPABASE_SERVICE_ROLE_KEY en el repo."
+            exit 1
+          fi
+
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "Escribiendo fila keep_alive ($NOW) para generar actividad real..."
+
           code=$(curl -s -o /tmp/body.txt -w "%{http_code}" --max-time 30 \
-            "$SUPABASE_URL/rest/v1/hours?select=id&limit=1" \
-            -H "apikey: $SUPABASE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_KEY")
-          echo "HTTP $code"
-          cat /tmp/body.txt
-          echo ""
-          # 2xx = la base respondio y proceso la query -> proyecto activo.
+            -X POST "$SUPABASE_URL/rest/v1/keep_alive" \
+            -H "apikey: $SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{\"pinged_at\":\"$NOW\"}")
+          curl_exit=$?
+
+          echo "curl exit: $curl_exit | HTTP: $code"
+          echo "body: $(cat /tmp/body.txt)"
+
+          # curl 6 = no resuelve DNS = el proyecto esta PAUSADO (o borrado).
+          if [ "$curl_exit" -eq 6 ]; then
+            echo "::error::El host no resuelve por DNS: el proyecto Supabase esta PAUSADO."
+            echo "El keep-alive NO puede despausar; hay que reanudarlo a mano una vez"
+            echo "en https://supabase.com/dashboard y luego este workflow lo mantiene vivo."
+            exit 1
+          fi
+          if [ "$curl_exit" -ne 0 ]; then
+            echo "::error::curl fallo (exit $curl_exit) por un problema de red/conexion."
+            exit 1
+          fi
+
+          # 2xx (201/204) = escritura OK.
           if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
-            echo "OK: Supabase respondio correctamente."
+            echo "OK: escritura registrada. Proyecto activo."
           else
-            echo "ERROR: Supabase no respondio con 2xx. Revisar el proyecto."
+            echo "::error::Supabase respondio HTTP $code. Revisar la tabla keep_alive,"
+            echo "la RLS o que el secret service_role sea correcto."
             exit 1
           fi
