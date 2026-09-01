@@ -1884,3 +1884,58 @@ body.dark-mode .toast {
     align-items: flex-start;
   }
 }
+
+/* ============================================================
+   StaggeredText — revelado escalonado (equivalente a React Bits)
+   ============================================================ */
+.staggered-text {
+  --st-duration: 620ms;
+  --st-shift: 0.9em;
+  display: inline-block;
+}
+
+.staggered-text__word {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.staggered-text__space {
+  display: inline-block;
+  white-space: pre;
+}
+
+.staggered-text__unit {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(var(--st-shift));
+  filter: blur(8px);
+  will-change: opacity, transform, filter;
+}
+
+.staggered-text.is-revealed .staggered-text__unit {
+  animation: staggered-text-in var(--st-duration) cubic-bezier(0.22, 1, 0.36, 1)
+    var(--st-delay, 0ms) both;
+}
+
+@keyframes staggered-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--st-shift));
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .staggered-text__unit,
+  .staggered-text.is-revealed .staggered-text__unit {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}

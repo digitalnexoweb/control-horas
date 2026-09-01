@@ -16,14 +16,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260831-1">
 </head>
 
 <body>
 
 <!-- LOGIN -->
 <div id="auth-container">
-  <p class="auth-kicker">Control de Horas</p>
+  <p class="auth-kicker staggered-text" data-staggered-text data-stagger="60" data-duration="760" data-delay="150" data-from="bottom" data-replay="hover">Control de Horas</p>
   <div class="auth-switch" role="tablist" aria-label="Opciones de acceso">
     <button id="showLoginViewBtn" class="auth-switch-btn active" type="button" data-auth-view="login" aria-pressed="true">Iniciar sesión</button>
     <button id="showRequestViewBtn" class="auth-switch-btn" type="button" data-auth-view="request" aria-pressed="false">Solicitar acceso</button>
@@ -417,6 +417,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260324-1"></script>
 <script src="script.js?v=20260324-1"></script>
+<script src="staggered-text.js?v=20260831-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 </body>
