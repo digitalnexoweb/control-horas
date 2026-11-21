@@ -685,3 +685,64 @@ Quiero que me devuelvas:
 - mejor experiencia de uso
 - detalle con edición de horas
 - mejor consistencia entre frontend y backend
+
+--------------------------------
+ACTUALIZACION DE CONTINUIDAD - 21 NOV 2026
+--------------------------------
+
+INCIDENTE: la app dejo de poder loguear.
+
+Sintoma visible para el usuario:
+- Al entrar a la app, toast de error:
+  "No se pudo conectar con Supabase Auth. Revisá que el proyecto de
+  Supabase esté activo y que la URL configurada siga vigente."
+- Pasaba en cualquier intento de login, con cualquier cuenta.
+
+Causa raiz (cadena de 4 eslabones, confirmada):
+
+1. Ultimo commit a `main`: 2026-09-01.
+2. GitHub deshabilita los workflows programados tras 60 dias sin actividad
+   en el repo. El workflow `Keep Supabase Alive` quedo en estado
+   `disabled_inactivity` el 2026-10-31 (1 sep + 60 dias = 31 oct, exacto).
+   Sus 89 corridas previas habian sido todas exitosas.
+3. Sin el ping diario de escritura a la tabla `keep_alive`, el proyecto de
+   Supabase (plan free) se auto-pauso por inactividad, alrededor del
+   2026-11-07.
+4. Proyecto pausado = el host `kslcypddazdiqnvnubrx.supabase.co` deja de
+   resolver por DNS = `fetch` falla con "Failed to fetch" =
+   `isAuthConnectionError()` en `frontend/auth.js` muestra ese toast.
+
+Leccion importante: el toast NO indica un bug de auth ni una URL mal
+configurada. Indica que la base esta caida o pausada. Si vuelve a aparecer,
+revisar PRIMERO el estado del proyecto en Supabase, no el codigo de login.
+
+Arreglo preventivo ya implementado (en `.github/workflows/keep-alive.yml`):
+
+- Se agrego el paso "Keep GitHub Actions schedule alive", que pushea un
+  commit vacio cuando el repo lleva 50+ dias sin commits, reseteando el
+  contador de inactividad de GitHub (limite 60, deja 10 de margen).
+- Va ANTES del ping a Supabase a proposito: el ping hace `exit 1` cuando el
+  proyecto esta pausado y corta el job, asi que si fuera despues nunca
+  correria justo cuando mas hace falta.
+- Requiere `permissions: contents: write` y `actions/checkout@v4`.
+- Un push hecho con `GITHUB_TOKEN` no dispara otros workflows (proteccion
+  anti-recursion de GitHub), asi que el commit vacio NO redeploya
+  `deploy.yml`.
+
+Pasos MANUALES que el keepalive no puede cubrir:
+
+- El keep-alive previene la proxima pausa, pero NO puede despausar una
+  pausa ya ocurrida. Despausar es a mano desde:
+  https://supabase.com/dashboard/project/kslcypddazdiqnvnubrx (Restore).
+- Un workflow en `disabled_inactivity` tampoco se reactiva solo ni con un
+  merge: hay que darle "Enable workflow" en la pestaña Actions.
+
+Nota de entorno (sesiones de Claude en la nube):
+
+- El entorno Default tiene red limitada con `allowed_hosts` vacio, asi que
+  los hosts de Supabase estan bloqueados por el proxy y el servidor MCP
+  `supabase-control-horas` no puede conectar (ERR_PROXY_TUNNEL).
+- Se creo un entorno personal `control-horas` que permite
+  `mcp.supabase.com`, `api.supabase.com` y
+  `kslcypddazdiqnvnubrx.supabase.co`. Elegir ese entorno al abrir sesiones
+  que necesiten tocar Supabase.
