@@ -8,6 +8,14 @@ name: Keep Supabase Alive
 # proyecto se pauso igual). Por eso hacemos una ESCRITURA real a una
 # tabla dedicada `keep_alive`, que si cuenta como actividad de base.
 #
+# SEGUNDO ESLABON DE LA CADENA (ver paso "Keep GitHub Actions schedule alive"):
+# GitHub deshabilita los workflows programados cuando el repo pasa 60 dias
+# sin actividad. Eso ya paso una vez: el ultimo commit fue el 2026-09-01,
+# el workflow quedo en estado `disabled_inactivity` el 2026-10-31, dejo de
+# pingear, y Supabase se auto-pauso a los ~7 dias. Para que no se repita,
+# este workflow hace un commit vacio cuando el repo lleva demasiados dias
+# quieto, reseteando el contador de GitHub.
+#
 # Requiere:
 #   - Tabla public.keep_alive (ver SQL en el repo / README).
 #   - Secret del repo SUPABASE_SERVICE_ROLE_KEY (service_role, la secreta).
@@ -17,11 +25,56 @@ on:
     - cron: "0 6 * * *" # todos los dias 06:00 UTC (~03:00 ART), margen amplio
   workflow_dispatch: # disparo manual desde la pestaña Actions
 
+# Necesario para que el commit de keepalive pueda pushearse a main.
+permissions:
+  contents: write
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     name: Ping Supabase
+
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Va PRIMERO a proposito: si Supabase esta pausado, el paso siguiente
+      # falla y corta el job. Manteniendo este paso antes, el schedule de
+      # GitHub sigue vivo incluso mientras la base esta caida.
+      - name: Keep GitHub Actions schedule alive
+        env:
+          # GitHub deshabilita a los 60 dias; 50 deja 10 de margen.
+          MAX_DAYS_WITHOUT_COMMIT: "50"
+        run: |
+          set -euo pipefail
+
+          LAST_COMMIT_TS=$(git log -1 --format=%ct)
+          NOW_TS=$(date -u +%s)
+          DAYS=$(( (NOW_TS - LAST_COMMIT_TS) / 86400 ))
+
+          echo "Ultimo commit hace $DAYS dias (umbral: $MAX_DAYS_WITHOUT_COMMIT)."
+
+          if [ "$DAYS" -lt "$MAX_DAYS_WITHOUT_COMMIT" ]; then
+            echo "Hubo actividad reciente: no hace falta commit de keepalive."
+            exit 0
+          fi
+
+          echo "Repo inactivo hace demasiado: pusheando commit vacio para"
+          echo "resetear el contador de inactividad de GitHub Actions."
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git commit --allow-empty \
+            -m "chore(keepalive): mantener activo el schedule de Actions" \
+            -m "Commit vacio automatico. GitHub deshabilita los workflows programados tras 60 dias sin actividad en el repo; sin este workflow corriendo, Supabase se auto-pausa y la app deja de poder loguear."
+
+          # Un push con GITHUB_TOKEN no dispara otros workflows (proteccion
+          # anti-recursion de GitHub), asi que esto NO redeploya deploy.yml.
+          git push origin HEAD:main
+
+          echo "Commit de keepalive pusheado."
+
       - name: Write to Supabase (real DB activity)
         env:
           SUPABASE_URL: "https://kslcypddazdiqnvnubrx.supabase.co"
