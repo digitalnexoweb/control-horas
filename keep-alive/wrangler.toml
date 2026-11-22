@@ -1,0 +1,29 @@
+#  Worker dedicado: mantiene vivo el proyecto Supabase del plan free.
+#
+#  Por que un Worker aparte y no el deploy de Pages:
+#  Cloudflare Pages NO soporta Cron Triggers. El handler `scheduled` solo
+#  existe en Workers, asi que el keep-alive vive en su propio Worker y se
+#  despliega una sola vez, independiente del deploy del frontend.
+#
+#  Despliegue (desde esta carpeta):
+#    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#    npx wrangler deploy
+#
+#  El cron de Cloudflare NO se auto-deshabilita por inactividad del repo,
+#  que es exactamente lo que apago el workflow de GitHub Actions el 31-10-2026.
+
+name = "control-horas-keep-alive"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# Todos los dias 06:00 UTC (~03:00 ART). Supabase pausa a los 7 dias de
+# inactividad, asi que una escritura diaria deja margen de sobra.
+[triggers]
+crons = ["0 6 * * *"]
+
+[vars]
+SUPABASE_URL = "https://kslcypddazdiqnvnubrx.supabase.co"
+KEEP_ALIVE_TABLE = "keep_alive"
+
+#  SUPABASE_SERVICE_ROLE_KEY NO va aca: es un secreto.
+#  Se carga con `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`.

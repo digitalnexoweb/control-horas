@@ -12,9 +12,17 @@ name: Keep Supabase Alive
 #   - Tabla public.keep_alive (ver SQL en el repo / README).
 #   - Secret del repo SUPABASE_SERVICE_ROLE_KEY (service_role, la secreta).
 
+# El cron de este workflow fue REMOVIDO a proposito.
+#
+# GitHub deshabilita los workflows programados tras 60 dias de inactividad del
+# repositorio. Paso el 31-10-2026 ("Scheduled workflows are disabled
+# automatically after 60 days of repository inactivity") y nadie se entero
+# hasta que el proyecto ya estaba pausado ~7 dias despues.
+#
+# El ping diario ahora lo hace un Cron Trigger de Cloudflare, que no se
+# auto-deshabilita: ver keep-alive/ en la raiz del repo.
+# Esto queda solo como disparo MANUAL de emergencia.
 on:
-  schedule:
-    - cron: "0 6 * * *" # todos los dias 06:00 UTC (~03:00 ART), margen amplio
   workflow_dispatch: # disparo manual desde la pestaña Actions
 
 jobs:
